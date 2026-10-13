@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MailSorter: Spam Email Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f6f8;--panel:#fff;--ink:#12263a;--mute:#52667a;--line:#d5dfe6;--teal:#0e7c7b;--on:#fff;--teal-soft:#d8efee;--amber-soft:#fdf0cc;--spam:#b3261e;--spam-soft:#fbe3e1;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1a26;--panel:#152536;--ink:#e6eef5;--mute:#9db1c3;--line:#2a3d50;--teal:#46c2bf;--on:#08201f;--teal-soft:#123b3d;--amber-soft:#3b3010;--spam:#ff8a80;--spam-soft:#3d1b1a}}
+:root[data-theme="dark"]{--bg:#0e1a26;--panel:#152536;--ink:#e6eef5;--mute:#9db1c3;--line:#2a3d50;--teal:#46c2bf;--on:#08201f;--teal-soft:#123b3d;--amber-soft:#3b3010;--spam:#ff8a80;--spam-soft:#3d1b1a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque","Segoe UI",sans-serif;margin:0;line-height:1.15}
+h1{font-size:30px;font-weight:800}h2{font-size:26px;margin-bottom:6px}h3{font-size:17px;margin-bottom:8px}
+.note{color:var(--mute);font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+button,input,textarea{font:inherit;color:var(--ink)}
+button{cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);padding:8px 14px}
+button:hover{border-color:var(--teal)}
+button.p{background:var(--teal);color:var(--on);border-color:var(--teal);font-weight:500}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+label{display:block;font-weight:500;margin:14px 0 4px}
+.hide{display:none!important}
+/* login */
+#login{min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr}
+.brand{background:var(--teal);color:var(--on);padding:48px;display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.brand h1{font-size:clamp(34px,5vw,56px);max-width:12ch}
+.brand p{max-width:40ch;margin:0}
+.lf{display:flex;align-items:center;justify-content:center;padding:32px}
+.lf form{width:100%;max-width:360px}
+@media(max-width:760px){#login{grid-template-columns:1fr}.brand{padding:32px 24px;min-height:220px}}
+/* app */
+#app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+nav{background:var(--panel);border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+nav .logo{font:800 20px "Bricolage Grotesque",sans-serif;padding:4px 10px 16px}
+nav button{text-align:left;border:0;background:none;padding:10px 12px}
+nav button.act{background:var(--teal-soft);font-weight:500}
+nav .sp{flex:1}
+main{padding:28px;max-width:980px;width:100%}
+@media(max-width:760px){#app{grid-template-columns:1fr}nav{flex-direction:row;overflow-x:auto;height:auto;position:sticky;top:0;z-index:5;padding:8px;border-right:0;border-bottom:1px solid var(--line)}nav .logo,nav .sp{display:none}nav button{white-space:nowrap}main{padding:18px}}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:16px 0}
+.g2{display:grid;gap:14px;grid-template-columns:1fr 1fr;margin:14px 0}
+@media(max-width:760px){.g2{grid-template-columns:1fr}}
+.stat b{display:block;font:800 30px "Bricolage Grotesque",sans-serif}
+.split{display:flex;height:34px;border-radius:6px;overflow:hidden;font-size:13px;font-weight:500;margin:10px 0}
+.split div{display:flex;align-items:center;padding-left:10px;color:var(--on)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--mute);font-weight:500}
+.sc{overflow-x:auto}
+.pend{color:var(--mute);font-style:italic}
+.bars{display:flex;align-items:flex-end;gap:10px;height:120px;margin-top:10px}
+.bars div{flex:1;background:var(--teal);border-radius:4px 4px 0 0;position:relative}
+.bars span{position:absolute;bottom:-22px;left:0;right:0;text-align:center;font-size:12px;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chips button{border-radius:999px;font-size:14px;padding:6px 12px}
+textarea{min-height:170px;resize:vertical}
+.res{display:none;margin-top:14px;padding:16px;border-radius:8px;border:2px solid}
+.res.ok{display:block;background:var(--teal-soft);border-color:var(--teal)}
+.res.bad{display:block;background:var(--spam-soft);border-color:var(--spam)}
+.res b{font:800 24px "Bricolage Grotesque",sans-serif;display:block}
+.meter{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin:8px 0}
+.meter i{display:block;height:100%;background:var(--spam);width:0;transition:width .3s}
+.tag{display:inline-block;background:var(--amber-soft);border-radius:4px;padding:2px 8px;font-size:13px;margin:2px}
+.pill{border-radius:999px;padding:2px 10px;font-size:13px;font-weight:500}
+.pill.ok{background:var(--teal-soft)}.pill.bad{background:var(--spam-soft)}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;text-align:center;font-size:14px}
+.cm div{padding:12px 6px;border:1px dashed var(--line);border-radius:6px}
+.steps{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));counter-reset:s;padding:0;list-style:none;margin:10px 0}
+.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px}
+.steps li::before{content:counter(s);font:800 20px "Bricolage Grotesque";color:var(--teal);display:block}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+<div class="brand"><h1>MailSorter</h1><p>Separates spam from genuine university email using a Decision Tree and XGBoost trained on the CEAS-08 corpus.</p></div>
+<div class="lf"><form id="lform">
+<h2>Sign in</h2><p class="note">Demo sign-in. Any email and password will open the app.</p>
+<label for="em">University email</label><input id="em" type="email" placeholder="name@university.edu" required>
+<label for="pw">Password</label><input id="pw" type="password" placeholder="Password" required>
+<label for="rl">Role</label><select id="rl" style="width:100%;padding:10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px"><option>Student</option><option>Faculty</option><option>Administrator</option></select>
+<button class="p" style="width:100%;margin-top:18px;padding:11px">Sign in</button>
+</form></div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+<nav aria-label="Main">
+<div class="logo">MailSorter</div>
+<button data-s="dash" class="act">Dashboard</button>
+<button data-s="pred">Check an email</button>
+<button data-s="models">Model results</button>
+<button data-s="data">Dataset</button>
+<button data-s="hist">History</button>
+<button data-s="about">About</button>
+<div class="sp"></div>
+<button id="theme">Switch theme</button>
+<button id="out">Sign out</button>
+</nav>
+<main>
+
+<section id="dash">
+<h1 id="hello">Dashboard</h1><p class="note">Overview of the dataset and your session.</p>
+<div class="grid">
+<div class="card stat"><b>39,154</b><span class="note">emails in CEAS-08</span></div>
+<div class="card stat"><b>99.1%</b><span class="note">XGBoost test accuracy</span></div>
+<div class="card stat"><b id="cChecked">0</b><span class="note">emails checked this session</span></div>
+<div class="card stat"><b id="cSpam">0</b><span class="note">flagged as spam</span></div>
+</div>
+<div class="g2">
+<div class="card"><h3>Class balance</h3><div class="split"><div style="width:44.2%;background:var(--teal)">Legit 17,312</div><div style="width:55.8%;background:var(--spam)">Spam 21,842</div></div><p class="note">44.2% legitimate and 55.8% spam. We report precision, recall and F1 as well as accuracy.</p></div>
+<div class="card"><h3>Start here</h3><p>Paste an email and see whether it goes to the inbox or the spam folder.</p><button class="p" data-s="pred">Check an email</button></div>
+</div>
+<div class="card"><h3>Pipeline</h3><ol class="steps"><li>Join subject and body</li><li>Clean the text</li><li>TF-IDF features</li><li>Decision Tree and XGBoost</li><li>5-fold stratified CV</li></ol></div>
+</section>
+
+<section id="pred" class="hide">
+<h2>Check an email</h2><p class="note">Paste the subject and body, or try an example.</p>
+<div class="card" style="margin-top:14px">
+<div class="chips" id="chips"></div>
+<label for="subj" style="margin-top:0">Subject</label><input id="subj" placeholder="Email subject">
+<label for="body">Body</label><textarea id="body" placeholder="Email body"></textarea>
+<label for="mdl">Model</label>
+<select id="mdl" style="padding:10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px"><option>XGBoost</option><option>Decision Tree</option></select>
+<div style="margin-top:14px"><button class="p" id="run">Classify email</button> <button id="clr">Clear</button></div>
+<div class="res" id="res" aria-live="polite"><b id="rv"></b><div class="meter"><i id="rb"></i></div><div class="note" id="rs"></div><div id="rt"></div></div>
+<p class="note" style="margin-top:14px">Demo only: this page scores keywords in your browser with two simple stand-ins for the Decision Tree and XGBoost. Connect it to the trained model's prediction endpoint to use real predictions.</p>
+</div>
+</section>
+
+<section id="models" class="hide">
+<h2>Model results</h2><p class="note">Decision Tree vs XGBoost, same TF-IDF input.</p>
+<div class="card sc" style="margin-top:14px"><table><tr><th>Metric</th><th>Decision Tree</th><th>XGBoost</th></tr>
+<tr><td>Test accuracy</td><td>98.70%</td><td><b>99.14%</b></td></tr>
+<tr><td>Test precision</td><td>98.28%</td><td><b>98.82%</b></td></tr>
+<tr><td>Test recall</td><td>99.40%</td><td><b>99.66%</b></td></tr>
+<tr><td>Test F1 score</td><td>98.84%</td><td><b>99.24%</b></td></tr>
+<tr><td>5-fold CV accuracy (mean)</td><td>98.37%</td><td><b>99.05%</b></td></tr>
+<tr><td>5-fold CV F1 (mean)</td><td>98.54%</td><td><b>99.15%</b></td></tr></table></div>
+<div class="card" style="margin-top:14px"><h3>Live results from this session</h3>
+<p class="note">The test metrics above are fixed (they come from the notebook). This block updates every time you classify an email, because both models score each one.</p>
+<div class="grid" style="margin:10px 0">
+<div class="card stat"><b id="mN">0</b><span class="note">emails scored</span></div>
+<div class="card stat"><b id="mDT">0</b><span class="note">Decision Tree: flagged spam</span></div>
+<div class="card stat"><b id="mXG">0</b><span class="note">XGBoost: flagged spam</span></div>
+<div class="card stat"><b id="mDis">0</b><span class="note">models disagreed</span></div>
+</div>
+<div class="sc"><table><thead><tr><th>Subject</th><th>Decision Tree</th><th>XGBoost</th></tr></thead><tbody id="mb"></tbody></table></div>
+<p class="note" id="me">Nothing scored yet. Open "Check an email" to start.</p></div>
+<div class="g2">
+<div class="card"><h3>Decision Tree</h3><p class="note">One tree of yes/no questions on word weights. Easy to explain, but can overfit.</p><div class="cm"><span></span><b>Pred. legit</b><b>Pred. spam</b><b>Legit</b><div>≈3,386</div><div>≈76</div><b>Spam</b><div>≈26</div><div>≈4,343</div></div></div>
+<div class="card"><h3>XGBoost</h3><p class="note">Many small trees, each correcting the last. Usually stronger, harder to inspect.</p><div class="cm"><span></span><b>Pred. legit</b><b>Pred. spam</b><b>Legit</b><div>≈3,410</div><div>≈52</div><b>Spam</b><div>≈15</div><div>≈4,354</div></div></div>
+</div>
+<p class="note">Metrics come from your notebook (7,831 test emails). The confusion-matrix counts are reconstructed from the reported precision, recall and class sizes, so treat them as approximate. XGBoost wins on every metric. False positives (real mail marked as spam) are the costlier error.</p>
+</section>
+
+<section id="data" class="hide">
+<h2>Dataset</h2><p class="note">Findings from the exploratory analysis.</p>
+<div class="g2" style="margin-top:14px">
+<div class="card sc"><h3>Summary</h3><table><tr><td>Emails</td><td>39,154</td></tr><tr><td>Legitimate / spam</td><td>17,312 / 21,842</td></tr><tr><td>Training / testing</td><td>31,323 / 7,831</td></tr><tr><td>TF-IDF features</td><td>10,000</td></tr></table></div>
+<div class="card sc"><h3>Averages per email</h3><table><tr><td>Length (characters)</td><td>1,103</td></tr><tr><td>Words</td><td>193</td></tr><tr><td>URLs</td><td>3.4</td></tr></table></div>
+</div>
+<div class="card"><h3>Earlier exploratory report</h3><p class="note">The separate EDA report covers a 6,048-email file (4,151 ham, 1,897 spam) with no missing values or duplicates, where spam averaged 6,541 characters against 4,801 for ham. Its figures differ from the 39,154-email CEAS-08 run used for the models above.</p></div>
+</section>
+
+<section id="hist" class="hide">
+<h2>History</h2><p class="note">Emails you checked in this session.</p>
+<div class="card sc" style="margin-top:14px"><table><thead><tr><th>Time</th><th>Subject</th><th>Model</th><th>Result</th></tr></thead><tbody id="hb"></tbody></table><p class="note" id="he">Nothing checked yet. Open "Check an email" to start.</p></div>
+</section>
+
+<section id="about" class="hide">
+<h2>About</h2>
+<div class="g2" style="margin-top:14px">
+<div class="card"><h3>The case</h3><p>A university gets timetables, announcements and newsletters mixed with phishing and prize scams. A single word like "urgent" cannot decide, so the model learns word combinations from labelled emails.</p></div>
+<div class="card"><h3>From the literature</h3><p>Heliyon review (Dada et al., 2019): judge filters on more than accuracy, treat false positives as costly, and expect spam to drift over time.</p></div>
+</div>
+<div class="card"><h3>Limits</h3><p class="note">The filter supports human review and does not replace it. Spam wording changes, so retrain on fresh labelled data.</p></div>
+</section>
+
+</main>
+</div>
+
+<script>
+var $=function(i){return document.getElementById(i)};
+var ex=[["Meeting","Meeting scheduled for tomorrow at 10 AM","Please find the agenda attached."],
+["Prize","Congratulations!","You have won a prize. Click here immediately to claim it."],
+["Timetable","Examination timetable updated","Your examination timetable has been updated. Please check the university portal."],
+["Account alert","Urgent: Your account will be closed today","Verify your password using this link."],
+["Password reset","Verify your password","Please verify your password to continue using the portal."]];
+var W={"urgent":2,"immediately":2,"won":2,"prize":3,"congratulations":2,"click here":3,"verify":2,"password":3,"closed today":3,"suspended":2,"winner":3,"claim":2,"link":1,"confirm":1};
+var n=0,sp=0;
+$("lform").onsubmit=function(e){e.preventDefault();var u=$("em").value.split("@")[0];$("hello").textContent="Welcome, "+u;$("login").classList.add("hide");$("app").classList.remove("hide");go("dash")};
+$("out").onclick=function(){$("app").classList.add("hide");$("login").classList.remove("hide")};
+function go(s){document.querySelectorAll("main section").forEach(function(x){x.classList.toggle("hide",x.id!==s)});document.querySelectorAll("nav button[data-s]").forEach(function(b){b.classList.toggle("act",b.dataset.s===s)});window.scrollTo(0,0)}
+document.addEventListener("click",function(e){var s=e.target.dataset&&e.target.dataset.s;if(s)go(s)});
+var ch=$("chips");
+ex.forEach(function(x){var b=document.createElement("button");b.textContent=x[0];b.onclick=function(){$("subj").value=x[1];$("body").value=x[2]};ch.appendChild(b)});
+$("clr").onclick=function(){$("subj").value="";$("body").value="";$("res").className="res"};
+function has(t,w){return new RegExp("\\b"+w+"\\b").test(t)}
+function dtScore(t){
+var f=[];function h(w){if(has(t,w)){f.push(w);return true}return false}
+var sp;
+if(h("prize")||h("winner")||h("won"))sp=true;
+else if(h("password")||h("verify"))sp=h("link")||h("click here")||h("urgent")||h("closed today");
+else if(h("click here"))sp=h("immediately")||h("claim");
+else sp=false;
+return {spam:sp,p:sp?0.95:0.06,f:f,note:"Decision Tree leaf: "+(sp?"spam":"legitimate")}}
+function xgScore(t,raw){
+var f=[],s=0;for(var w in W){if(has(t,w)){s+=W[w];f.push(w)}}
+var urls=(raw.match(/https?:\/\/|www\./gi)||[]).length,ex=(raw.match(/!/g)||[]).length;
+var z=-3+0.8*s+0.5*urls+0.3*ex,p=1/(1+Math.exp(-z));
+return {spam:p>=0.5,p:p,f:f,note:"XGBoost spam probability "+Math.round(p*100)+"%"}}
+var sess={n:0,dt:0,xg:0,dis:0};
+function pill(b){return '<span class="pill '+(b?"bad":"ok")+'">'+(b?"Spam":"Legitimate")+"</span>"}
+$("run").onclick=function(){
+var subj=$("subj").value.trim(),raw=subj+" "+$("body").value,t=raw.toLowerCase();
+if(!t.trim())return;
+var d=dtScore(t),x=xgScore(t,raw),m=$("mdl").value,r=m==="XGBoost"?x:d,o=m==="XGBoost"?d:x,bad=r.spam,pct=Math.round(r.p*100);
+$("res").className="res "+(bad?"bad":"ok");
+$("rv").textContent=bad?"Spam: send to spam folder":"Legitimate: deliver to inbox";
+$("rb").style.width=pct+"%";
+$("rs").textContent=m+": spam signal "+pct+"%. "+(o.spam===bad?"The other model agrees.":"The other model disagrees ("+(o.spam?"spam":"legitimate")+").");
+var fw=r.f.length?r.f:[];$("rt").innerHTML=fw.map(function(w){return '<span class="tag">'+w+'</span>'}).join("");
+n++;if(bad)sp++;$("cChecked").textContent=n;$("cSpam").textContent=sp;
+var tr=document.createElement("tr");
+tr.innerHTML="<td>"+new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+"</td><td></td><td>"+m+"</td><td>"+pill(bad)+"</td>";
+tr.children[1].textContent=subj||"(no subject)";
+$("hb").insertBefore(tr,$("hb").firstChild);$("he").classList.add("hide");
+sess.n++;if(d.spam)sess.dt++;if(x.spam)sess.xg++;if(d.spam!==x.spam)sess.dis++;
+$("mN").textContent=sess.n;$("mDT").textContent=sess.dt;$("mXG").textContent=sess.xg;$("mDis").textContent=sess.dis;
+var mr=document.createElement("tr");
+mr.innerHTML="<td></td><td>"+pill(d.spam)+"</td><td>"+pill(x.spam)+" <span class=\"note\">"+Math.round(x.p*100)+"%</span></td>";
+mr.children[0].textContent=subj||"(no subject)";
+$("mb").insertBefore(mr,$("mb").firstChild);$("me").classList.add("hide")};
+$("theme").onclick=function(){var r=document.documentElement,d=matchMedia("(prefers-color-scheme:dark)").matches;var c=r.getAttribute("data-theme")||(d?"dark":"light");r.setAttribute("data-theme",c==="dark"?"light":"dark")};
+</script>
+</body>
+</html>
